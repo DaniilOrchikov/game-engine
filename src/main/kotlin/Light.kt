@@ -14,16 +14,16 @@ import kotlin.math.*
 class Light(var x: Float, var y: Float, private val r: Float) {
     private val rays = ArrayList<Vector4fWithAngle>()
     private val forkJoinPool = ForkJoinPool()
-    private val rayCount = 300
+    private val rayCount = 200
     private val angles = Array(rayCount) { Vector3f(0f, 0f, 0f) }
     private val piPerMilli = PI.toFloat() / 1000f
 
     init {
         repeat(rayCount) { i ->
             val angle = (2 * PI / rayCount * i).toFloat()
-            angles[i].x = cos(angle)
-            angles[i].y = sin(angle)
-            angles[i].z = angle
+            angles[i].x = cos(angle + piPerMilli)
+            angles[i].y = sin(angle + piPerMilli)
+            angles[i].z = angle + piPerMilli
         }
     }
 
@@ -78,35 +78,34 @@ class Light(var x: Float, var y: Float, private val r: Float) {
         }
         newRays.sortWith { a, b -> compareValues(a.angle, b.angle) }
         rays.clear()
-        val arr = ArrayList<Vector4fWithAngle>()
-        for (i in newRays) {
-            if (i.type == "central") rays.add(i)
-            else if (i.type == "side") {
-                rays.add(i)
-                if (distance(x, y, Vector2f(i.vec.z, i.vec.w)) < r.pow(2)) {
-                    arr.clear()
-                } else {
-                    rays.addAll(arr)
-                    arr.clear()
-                }
-            } else
-                arr.add(i)
+        rays.add(newRays[0])
+        for (i in 1 until newRays.size) {
+            val vLast = newRays[i - 1]
+            val v = newRays[i]
+            val vNext = newRays[(i + 1) % newRays.size]
+            if (round(distance(x, y, Vector2f(vLast.vec.z, vLast.vec.w))) == r.pow(2) &&
+                round(distance(x, y, Vector2f(v.vec.z, v.vec.w))) != r.pow(2)
+            ) {
+                val newRay = Vector4fWithAngle(
+                    Vector4f(
+                        x, y,
+                        cos((vLast.angle + v.angle) / 2) * r + x,
+                        sin((vLast.angle + v.angle) / 2) * r + y
+                    ),
+                    (vLast.angle + v.angle) / 2, "ordinary"
+                )
+                findingIntersections(newRay, polygons)
+                rays.add(newRay)
+            }
+            if (newRays[i].type != "ordinary" ||
+                !(vLast.vec.z == v.vec.z && v.vec.z == vNext.vec.z || vLast.vec.w == v.vec.w && v.vec.w == vNext.vec.w ||
+                        collinearityCheck(
+                            v.vec.z - vLast.vec.z, v.vec.w - vLast.vec.w,
+                            vNext.vec.z - v.vec.z, vNext.vec.w - v.vec.w
+                        ))
+            ) rays.add(newRays[i])
         }
-        rays.addAll(arr)
         rays.sortWith { a, b -> compareValues(a.angle, b.angle) }
-//        rays.add(newRays[0])
-//        for (i in 1 until newRays.size) {
-//            if (!newRays[i].deletable ||
-//                !(newRays[i - 1].vec.z == newRays[i].vec.z && newRays[i].vec.z == newRays[(i + 1) % newRays.size].vec.z ||
-//                        newRays[i - 1].vec.w == newRays[i].vec.w && newRays[i].vec.w == newRays[(i + 1) % newRays.size].vec.w ||
-//                        collinearityCheck(
-//                            newRays[i].vec.z - newRays[i - 1].vec.z,
-//                            newRays[i].vec.w - newRays[i - 1].vec.w,
-//                            newRays[(i + 1) % newRays.size].vec.z - newRays[i].vec.z,
-//                            newRays[(i + 1) % newRays.size].vec.w - newRays[i].vec.w
-//                        ))
-//            ) rays.add(newRays[i])
-//        }
     }
 
     fun render(graphics: Graphics) {
@@ -133,17 +132,7 @@ class Light(var x: Float, var y: Float, private val r: Float) {
         override fun compute() {
             if (end - start <= 40) {
                 for (i in start until end) {
-                    val vec = rays[i]
-                    var point = Vector2f(vec.vec.z, vec.vec.w)
-                    for (obj in polygons) {
-                        for (line in obj.lines) {
-                            val p = findIntersection(vec.vec, line) ?: continue
-                            point = if (distance(x, y, Vector2f(point)) < distance(x, y, Vector2f(p))) point else p
-                        }
-                    }
-                    vec.vec.z = point.x
-                    vec.vec.w = point.y
-                    rays[i] = vec
+                    findingIntersections(rays[i], polygons)
                 }
             } else {
                 val mid = start + (end - start) / 2
@@ -153,5 +142,17 @@ class Light(var x: Float, var y: Float, private val r: Float) {
                 )
             }
         }
+    }
+
+    fun findingIntersections(ray: Vector4fWithAngle, polygons: ArrayList<MyPolygon>) {
+        var point = Vector2f(ray.vec.z, ray.vec.w)
+        for (obj in polygons) {
+            for (line in obj.lines) {
+                val p = findIntersection(ray.vec, line) ?: continue
+                point = if (distance(x, y, Vector2f(point)) < distance(x, y, Vector2f(p))) point else p
+            }
+        }
+        ray.vec.z = point.x
+        ray.vec.w = point.y
     }
 }

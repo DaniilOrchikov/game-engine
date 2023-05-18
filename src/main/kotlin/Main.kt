@@ -1,4 +1,6 @@
 import org.newdawn.slick.*
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
 import kotlin.random.Random
 
 class MyGame(title: String) : BasicGame(title) {
@@ -7,7 +9,8 @@ class MyGame(title: String) : BasicGame(title) {
     private val light = Light(200f, 200f, 250f)
     private val light1 = Light(700f, 200f, 3000f)
     private lateinit var surface: Image
-    lateinit var g: Graphics
+    private lateinit var g: Graphics
+    private val pool = Executors.newFixedThreadPool(7)
 
     override fun init(gc: GameContainer) {
         polygons.add(
@@ -73,8 +76,19 @@ class MyGame(title: String) : BasicGame(title) {
     }
 
     override fun update(gc: GameContainer, delta: Int) {
-        light.update(polygons)
-        light1.update(polygons)
+        val f1 = pool.submit {
+            light.update(polygons)
+        }
+        val f2 = pool.submit {
+            light1.update(polygons)
+        }
+
+        try {
+            f1.get()
+            f2.get()
+        } catch (_: InterruptedException) {
+        } catch (_: ExecutionException) {
+        }
     }
 
     override fun render(gc: GameContainer, graphics: Graphics) {

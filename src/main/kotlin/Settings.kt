@@ -1,5 +1,6 @@
 const val WIDTH = 1920
 const val HEIGHT = 1080
+const val SCALE = 2
 const val FULLSCREEN = true
 const val FPS = 60
 

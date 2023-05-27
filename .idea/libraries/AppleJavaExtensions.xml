@@ -16,6 +16,12 @@
       <root url="jar://$PROJECT_DIR$/../../LWJGL/jar/substance-7.2.1.jar!/" />
       <root url="jar://$PROJECT_DIR$/../../LWJGL/jar/trident-7.2.1.jar!/" />
       <root url="jar://$PROJECT_DIR$/../../Slick2D/lib/slick.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../Slick2D/lib/jorbis-0.0.15.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../Slick2D/lib/jnlp.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../Slick2D/lib/ibxm.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../Slick2D/lib/jogg-0.0.7.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../Slick2D/lib/tinylinepp.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../../Slick2D/lib/natives-windows.jar!/" />
     </CLASSES>
     <JAVADOC />
     <NATIVE>

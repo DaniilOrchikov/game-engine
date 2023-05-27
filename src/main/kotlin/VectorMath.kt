@@ -1,12 +1,12 @@
-import org.lwjgl.util.vector.Vector2f
 import org.lwjgl.util.vector.Vector4f
+import org.newdawn.slick.geom.Vector2f
 import kotlin.math.*
 
-fun findIntersection(segment1: Vector4f, segment2: Vector4f): Vector2f? {
-    val x1: Float = segment1.x
-    val y1: Float = segment1.y
-    val x2: Float = segment1.z
-    val y2: Float = segment1.w
+fun findIntersection(x:Float, y:Float, segment1: Vector2f, segment2: Vector4f): Vector2f? {
+    val x1: Float = x
+    val y1: Float = y
+    val x2: Float = segment1.x + x
+    val y2: Float = segment1.y + y
     val x3: Float = segment2.x
     val y3: Float = segment2.y
     val x4: Float = segment2.z

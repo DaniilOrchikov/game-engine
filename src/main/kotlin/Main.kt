@@ -1,13 +1,14 @@
 import org.newdawn.slick.*
-import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
+import kotlin.system.exitProcess
 
 class MyGame(title: String) : BasicGame(title) {
 
     private val polygons = ArrayList<MyPolygon>()
-    private val light = Light(200f, 200f, 250f)
-    private val light1 = Light(700f, 200f, 3000f)
+    private val light = Light(100f, 100f, 200f)
+    private val light1 = Light(100f, 100f, 2000f)
     private lateinit var surface: Image
     private lateinit var g: Graphics
     private val pool = Executors.newFixedThreadPool(7)
@@ -16,21 +17,33 @@ class MyGame(title: String) : BasicGame(title) {
         polygons.add(
             MyPolygon(
                 floatArrayOf(
-                    20f, 20f,
-                    WIDTH.toFloat() / 2 - 20, 20f,
-                    WIDTH.toFloat() / 2 - 20, HEIGHT.toFloat() / 2 - 20,
-                    20f, HEIGHT.toFloat() / 2 - 20
+                    0f,0f,
+                    WIDTH.toFloat() / SCALE, 0f,
+                    WIDTH.toFloat() / SCALE + 1, HEIGHT.toFloat() / SCALE + 1,
+                    0f, HEIGHT.toFloat() / SCALE + 1
                 )
             )
         )
-        surface = Image(WIDTH / 2, HEIGHT / 2)
+        surface = Image(WIDTH / SCALE, HEIGHT / SCALE)
         surface.filter = Image.FILTER_NEAREST
         g = surface.graphics
+        light.init()
+        light1.init()
     }
 
     //Кнопка нажата
     override fun keyPressed(key: Int, c: Char) {
-
+        if (key == Input.KEY_ESCAPE) {
+            light.exit()
+//            light1.exit()
+            pool.shutdown()
+            try {
+                pool.awaitTermination(5, TimeUnit.SECONDS)
+            } catch (e: InterruptedException) {
+                e.printStackTrace()
+            }
+            exitProcess(0);
+        }
     }
 
     //Кнопка отжата
@@ -42,12 +55,12 @@ class MyGame(title: String) : BasicGame(title) {
         polygons.add(
             MyPolygon(
                 floatArrayOf(
-                    Random.nextDouble((x / 2 - 100).toDouble(), (x / 2 - 20).toDouble()).toFloat(),
-                    Random.nextDouble((y / 2 - 100).toDouble(), (y / 2 - 20).toDouble()).toFloat(),
-                    Random.nextDouble((x / 2 + 20).toDouble(), (x / 2 + 100).toDouble()).toFloat(),
-                    Random.nextDouble((y / 2 - 100).toDouble(), (y / 2 - 20).toDouble()).toFloat(),
-                    Random.nextDouble((x / 2 + 20).toDouble(), (x / 2 + 100).toDouble()).toFloat(),
-                    Random.nextDouble((y / 2 + 20).toDouble(), (y / 2 + 100).toDouble()).toFloat(),
+                    Random.nextDouble((x / SCALE - 50).toDouble(), (x / SCALE - 10).toDouble()).toFloat(),
+                    Random.nextDouble((y / SCALE - 50).toDouble(), (y / SCALE - 10).toDouble()).toFloat(),
+                    Random.nextDouble((x / SCALE + 10).toDouble(), (x / SCALE + 50).toDouble()).toFloat(),
+                    Random.nextDouble((y / SCALE - 50).toDouble(), (y / SCALE - 10).toDouble()).toFloat(),
+                    Random.nextDouble((x / SCALE + 10).toDouble(), (x / SCALE + 50).toDouble()).toFloat(),
+                    Random.nextDouble((y / SCALE + 10).toDouble(), (y / SCALE + 50).toDouble()).toFloat(),
                 )
             )
         )
@@ -63,8 +76,8 @@ class MyGame(title: String) : BasicGame(title) {
 
     //Мышь двигается
     override fun mouseMoved(oldx: Int, oldy: Int, newx: Int, newy: Int) {
-        light.x = newx.toFloat() / 2
-        light.y = newy.toFloat() / 2
+        light.x = newx.toFloat() / SCALE
+        light.y = newy.toFloat() / SCALE
     }
 
     //Мышь отжата (лучше не использовать)
@@ -76,29 +89,17 @@ class MyGame(title: String) : BasicGame(title) {
     }
 
     override fun update(gc: GameContainer, delta: Int) {
-        val f1 = pool.submit {
-            light.update(polygons)
-        }
-        val f2 = pool.submit {
-            light1.update(polygons)
-        }
-
-        try {
-            f1.get()
-            f2.get()
-        } catch (_: InterruptedException) {
-        } catch (_: ExecutionException) {
-        }
+        light.update(polygons)
+        light1.update(polygons)
     }
 
     override fun render(gc: GameContainer, graphics: Graphics) {
-        g.color = Color(0, 0, 0)
-        g.fillRect(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat())
-        g.color = Color(255, 255, 255)
-        for (obj in polygons) obj.render(g)
+        g.clear()
         light.render(g)
         light1.render(g)
-        graphics.drawImage(surface.getScaledCopy(2f), 0f, 0f)
+        g.color = Color(255, 255, 255)
+        for (obj in polygons) obj.render(g)
+        graphics.drawImage(surface.getScaledCopy(SCALE.toFloat()), 0f, 0f)
         graphics.flush()
         g.flush()
     }

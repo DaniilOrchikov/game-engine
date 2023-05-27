@@ -1,70 +1,55 @@
-import org.lwjgl.util.vector.Vector2f
-import org.lwjgl.util.vector.Vector3f
-import org.lwjgl.util.vector.Vector4f
+import org.lwjgl.opengl.GL11
 import org.newdawn.slick.Color
 import org.newdawn.slick.Graphics
+import org.newdawn.slick.Image
+import org.newdawn.slick.geom.Circle
 import org.newdawn.slick.geom.Polygon
-import org.newdawn.slick.geom.ShapeRenderer
+import org.newdawn.slick.geom.Vector2f
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.RecursiveAction
-import kotlin.math.*
+import java.util.concurrent.TimeUnit
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
 
-
-class Light(var x: Float, var y: Float, private val r: Float) {
-    private val rays = ArrayList<Vector4fWithAngle>()
+class Light(var x: Float, var y: Float, private val radius: Float) {
+    private val rays = ArrayList<Vector2fWithAngle>()
     private val forkJoinPool = ForkJoinPool()
-    private val rayCount = 200
-    private val angles = Array(rayCount) { Vector3f(0f, 0f, 0f) }
-    private val piPerMilli = PI.toFloat() / 1000f
+    private val piPerMilli = PI.toFloat() / 10000f
+    private lateinit var surface: Image
+    private lateinit var g: Graphics
+    private val k = 5000f
 
-    init {
-        repeat(rayCount) { i ->
-            val angle = (2 * PI / rayCount * i).toFloat()
-            angles[i].x = cos(angle + piPerMilli)
-            angles[i].y = sin(angle + piPerMilli)
-            angles[i].z = angle + piPerMilli
-        }
+    private lateinit var shadowIm: Image
+    fun init() {
+        shadowIm = Image(WIDTH / SCALE * 2, HEIGHT / SCALE * 2)
+        shadowIm.graphics.fill(Circle(shadowIm.width.toFloat() / 2, shadowIm.height.toFloat() / 2, radius))
+        surface = Image(WIDTH / SCALE, HEIGHT / SCALE)
+        g = surface.graphics
     }
 
     fun update(polygons: ArrayList<MyPolygon>) {
-        val newRays = ArrayList<Vector4fWithAngle>()
-        repeat(rayCount) { i ->
-            val cs = angles[i].x
-            val si = angles[i].y
-            newRays.add(
-                Vector4fWithAngle(
-                    Vector4f(
-                        x, y,
-                        cs * r + x, si * r + y
-                    ), angles[i].z, "ordinary"
-                )
-            )
-        }
+        val newRays = ArrayList<Vector2fWithAngle>()
         for (i in polygons) {
             for (j in i.points) {
-                if (distance(x, y, j) <= r.pow(2)) {
+                if (distance(x, y, j) <= k.pow(2)) {
                     val angle = angle(j.x - x, j.y - y)
-                    newRays.add(
-                        Vector4fWithAngle(
-                            Vector4f(x, y, j.x, j.y),
-                            angle, "central"
-                        )
-                    )
                     var cs = cos(angle + piPerMilli)
                     var si = sin(angle + piPerMilli)
                     newRays.add(
-                        Vector4fWithAngle(
-                            Vector4f(x, y, cs * r + x, si * r + y),
-                            angle + piPerMilli, "side"
+                        Vector2fWithAngle(
+                            Vector2f(cs * k, si * k),
+                            angle + piPerMilli
                         )
                     )
                     cs = cos(angle - piPerMilli)
                     si = sin(angle - piPerMilli)
                     newRays.add(
-                        Vector4fWithAngle(
-                            Vector4f(x, y, cs * r + x, si * r + y),
-                            angle - piPerMilli, "side"
+                        Vector2fWithAngle(
+                            Vector2f(cs * k, si * k),
+                            angle - piPerMilli
                         )
                     )
                 }
@@ -76,61 +61,42 @@ class Light(var x: Float, var y: Float, private val r: Float) {
         } catch (_: InterruptedException) {
         } catch (_: ExecutionException) {
         }
-        newRays.sortWith { a, b -> compareValues(a.angle, b.angle) }
+
         rays.clear()
-        rays.add(newRays[0])
-        for (i in 1 until newRays.size) {
-            val vLast = newRays[i - 1]
-            val v = newRays[i]
-            val vNext = newRays[(i + 1) % newRays.size]
-            if (round(distance(x, y, Vector2f(vLast.vec.z, vLast.vec.w))) == r.pow(2) &&
-                round(distance(x, y, Vector2f(v.vec.z, v.vec.w))) != r.pow(2)
-            ) {
-                val newRay = Vector4fWithAngle(
-                    Vector4f(
-                        x, y,
-                        cos((vLast.angle + v.angle) / 2) * r + x,
-                        sin((vLast.angle + v.angle) / 2) * r + y
-                    ),
-                    (vLast.angle + v.angle) / 2, "ordinary"
-                )
-                findingIntersections(newRay, polygons)
-                rays.add(newRay)
-            }
-            if (newRays[i].type != "ordinary" ||
-                !(vLast.vec.z == v.vec.z && v.vec.z == vNext.vec.z || vLast.vec.w == v.vec.w && v.vec.w == vNext.vec.w ||
-                        collinearityCheck(
-                            v.vec.z - vLast.vec.z, v.vec.w - vLast.vec.w,
-                            vNext.vec.z - v.vec.z, vNext.vec.w - v.vec.w
-                        ))
-            ) rays.add(newRays[i])
-        }
+        rays.addAll(newRays)
         rays.sortWith { a, b -> compareValues(a.angle, b.angle) }
     }
 
     fun render(graphics: Graphics) {
-        graphics.color = Color(255, 255, 255, 100)
+        g.clear()
+        g.color = Color(255, 255, 0, 250)
         for ((i, ray) in rays.withIndex()) {
-            ShapeRenderer.fill(
+            g.fill(
                 Polygon(
                     floatArrayOf(
                         x, y,
-                        ray.vec.z, ray.vec.w,
-                        rays[(i + 1) % rays.size].vec.z, rays[(i + 1) % rays.size].vec.w
+                        ray.vec.x + x, ray.vec.y + y,
+                        rays[(i + 1) % rays.size].vec.x + x, rays[(i + 1) % rays.size].vec.y + y
                     )
                 )
             )
         }
+        GL11.glEnable(GL11.GL_BLEND)
+        GL11.glBlendFunc(GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_SRC_ALPHA)
+        g.drawImage(shadowIm, x - shadowIm.width / 2, y - shadowIm.height / 2)
+        GL11.glDisable(GL11.GL_BLEND)
+        g.setDrawMode(Graphics.MODE_NORMAL)
+        graphics.drawImage(surface, 0f, 0f)
     }
 
     inner class RayTask(
         private val x: Float, private val y: Float,
-        private val polygons: ArrayList<MyPolygon>, private val rays: MutableList<Vector4fWithAngle>,
+        private val polygons: ArrayList<MyPolygon>, private val rays: MutableList<Vector2fWithAngle>,
         private val start: Int, private val end: Int
     ) : RecursiveAction() {
 
         override fun compute() {
-            if (end - start <= 40) {
+            if (end - start <= 4) {
                 for (i in start until end) {
                     findingIntersections(rays[i], polygons)
                 }
@@ -144,15 +110,24 @@ class Light(var x: Float, var y: Float, private val r: Float) {
         }
     }
 
-    fun findingIntersections(ray: Vector4fWithAngle, polygons: ArrayList<MyPolygon>) {
-        var point = Vector2f(ray.vec.z, ray.vec.w)
+    fun findingIntersections(ray: Vector2fWithAngle, polygons: ArrayList<MyPolygon>) {
+        var point = Vector2f(ray.vec.x, ray.vec.y)
         for (obj in polygons) {
             for (line in obj.lines) {
-                val p = findIntersection(ray.vec, line) ?: continue
+                val p = findIntersection(x, y, ray.vec, line) ?: continue
                 point = if (distance(x, y, Vector2f(point)) < distance(x, y, Vector2f(p))) point else p
             }
         }
-        ray.vec.z = point.x
-        ray.vec.w = point.y
+        ray.vec.x = point.x - x
+        ray.vec.y = point.y - y
+    }
+
+    fun exit() {
+        forkJoinPool.shutdown()
+        try {
+            forkJoinPool.awaitTermination(5, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            e.printStackTrace()
+        }
     }
 }

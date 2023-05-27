@@ -1,7 +1,7 @@
-import org.lwjgl.util.vector.Vector2f
 import org.lwjgl.util.vector.Vector4f
 import org.newdawn.slick.Graphics
 import org.newdawn.slick.geom.Polygon
+import org.newdawn.slick.geom.Vector2f
 
 class MyPolygon(points: FloatArray) {
     private val polygon: Polygon
